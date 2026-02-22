@@ -3,80 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp DP Downloader - HD Profile Pictures</title>
+    <title>WhatsApp DP Finder</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <meta name="description" content="Download WhatsApp profile pictures in HD quality instantly">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="logo">
-                <i class="fab fa-whatsapp"></i>
-                <h1>WhatsApp DP</h1>
-                <span>Downloader</span>
-            </div>
-            <p>Download HD WhatsApp profile pictures instantly</p>
-        </header>
+        <div class="header">
+            <h1><i class="fab fa-whatsapp"></i> WhatsApp DP Finder</h1>
+            <p>Enter phone number to find profile picture</p>
+        </div>
 
-        <main>
-            <div class="search-box">
-                <div class="input-group">
-                    <i class="fas fa-user"></i>
-                    <input type="tel" id="username" placeholder="Enter phone number (+919876543210)" maxlength="16">
-                    <button id="searchBtn">
-                        <i class="fas fa-search"></i>
-                        <span>Search DP</span>
-                    </button>
+        <div class="search-box">
+            <div class="input-group">
+                <input type="tel" id="username" placeholder="+919876543210" maxlength="17" autocomplete="tel-country">
+                <button id="searchBtn">
+                    <i class="fas fa-search"></i>
+                    <span>Search DP</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Finding profile picture...</p>
+        </div>
+
+        <div id="error" class="error">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorMsg"></span>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+            <div class="profile-card">
+                <div class="profile-image">
+                    <img id="dpImage" alt="Profile Picture" loading="lazy">
                 </div>
-                <div class="input-hint">
-                    <small>✅ Enter with country code | Works worldwide | No login needed</small>
-                </div>
-            </div>
-
-            <div class="features">
-                <div class="feature"><i class="fas fa-download"></i>HD Quality</div>
-                <div class="feature"><i class="fas fa-mobile-alt"></i>Mobile Ready</div>
-                <div class="feature"><i class="fas fa-bolt"></i>Instant</div>
-                <div class="feature"><i class="fas fa-globe"></i>Global</div>
-            </div>
-
-            <div class="results" id="results" style="display: none;">
-                <div class="profile-card">
-                    <div class="profile-img">
-                        <img id="dpImage" src="" alt="Profile Picture">
-                        <div class="download-overlay">
-                            <button id="downloadBtn" class="download-btn">
-                                <i class="fas fa-download"></i>
-                                Download HD
-                            </button>
-                        </div>
-                    </div>
-                    <div class="profile-info">
-                        <h3 id="profileName">User Profile</h3>
-                        <p id="phoneNumber"></p>
-                        <div class="stats">
-                            <span id="quality"><i class="fas fa-image"></i> HD Quality</span>
-                            <span id="size"><i class="fas fa-expand"></i> Original</span>
-                        </div>
+                <div class="profile-info">
+                    <h3 id="profileName">Loading...</h3>
+                    <p id="phoneNumber"></p>
+                    <div class="stats">
+                        <span id="quality"><i class="fas fa-image"></i> Loading...</span>
+                        <span id="size"><i class="fas fa-expand"></i> Loading...</span>
                     </div>
                 </div>
             </div>
+            <button id="downloadBtn" class="download-btn">
+                <i class="fas fa-download"></i>
+                Download HD
+            </button>
+        </div>
 
-            <div class="loading" id="loading" style="display: none;">
-                <div class="spinner"></div>
-                <p>🔍 Fetching WhatsApp profile...</p>
-            </div>
-
-            <div class="error" id="error" style="display: none;">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span id="errorMsg">Error message</span>
-            </div>
-        </main>
-
-        <footer>
-            <p><i class="fas fa-heart"></i> Free WhatsApp DP Downloader 2026</p>
-        </footer>
+        <div class="footer">
+            <p><i class="fas fa-shield-alt"></i> For testing purposes only</p>
+        </div>
     </div>
 
     <script src="script.js"></script>
