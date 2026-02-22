@@ -1,7 +1,7 @@
 {
-  "name": "whatsapp-dp-downloader",
-  "version": "1.0.0",
-  "description": "WhatsApp Profile Picture Downloader",
+  "name": "whatsapp-dp-finder",
+  "version": "2.0.0",
+  "description": "WhatsApp DP Finder with Private Bypass",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,15 +9,10 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "axios": "^1.6.0",
     "cors": "^2.8.5",
-    "compression": "^1.7.4",
-    "helmet": "^7.1.0"
+    "node-fetch": "^2.7.0"
   },
   "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": ["whatsapp", "downloader", "dp"],
-  "author": "SSG",
-  "license": "MIT"
+    "node": ">=16.0.0"
+  }
 }
