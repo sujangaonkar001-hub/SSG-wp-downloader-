@@ -1,118 +1,126 @@
 const express = require('express');
-const path = require('path');
 const cors = require('cors');
-const compression = require('compression');
-const helmet = require('helmet');
-const axios = require('axios');
+const fetch = require('node-fetch');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security & Performance Middleware
-app.use(helmet());
-app.use(compression());
-app.use(cors({
-    origin: "*",
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type']
-}));
+// Middleware
+app.use(cors());
+app.use(express.static('public'));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve Frontend
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// ✅ PRIVATE DP BYPASS - Multiple WhatsApp APIs
+const WHATSAPP_APIS = [
+    'https://api.wati.io/api/v1/getProfilePicture',
+    'https://profile.wapp.dynv6.net',
+    'https://dp.wapp.dynv6.net',
+    'https://api.whatsapp-profile.com',
+    'https://wapp-profile.wapp.dynv6.net'
+];
 
-// API: WhatsApp DP Downloader
 app.get('/api/dp/:phone', async (req, res) => {
+    const phone = req.params.phone.replace(/[^\d]/g, '');
+    
+    if (phone.length < 10) {
+        return res.json({ success: false, message: 'Invalid phone number' });
+    }
+
     try {
-        const phone = req.params.phone.replace(/[^0-9]/g, '');
-        
-        if (phone.length < 10) {
-            return res.json({ 
-                success: false, 
-                message: 'Phone number too short',
-                url: null 
-            });
-        }
-
-        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-        
-        // Real WhatsApp Web endpoints
-        const endpoints = [
-            `https://web.whatsapp.com/pp/${phone}@s.whatsapp.net`,
-            `https://pps.whatsapp.net/v/t61/${generateHash(phone)}?oh=${generateOH()}&oe=66666666`,
-            `https://web.whatsapp.com/img?text=${phone}`
-        ];
-
-        // Try each endpoint
-        for (let url of endpoints) {
+        // Try multiple WhatsApp DP endpoints
+        for (const api of WHATSAPP_APIS) {
             try {
-                const response = await axios.head(url, {
-                    headers: { 
-                        'User-Agent': userAgent,
-                        'Referer': 'https://web.whatsapp.com/',
-                        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+                const url = `${api}/${phone}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept': 'image/*'
                     },
-                    timeout: 8000
+                    timeout: 5000
                 });
-                
-                if (response.headers['content-type']?.includes('image')) {
-                    return res.json({ 
-                        success: true, 
-                        url: url,
-                        filename: `whatsapp-dp-${phone.slice(-8)}.jpg`,
-                        size: response.headers['content-length'] || 'HD'
+
+                if (response.ok && response.headers.get('content-type')?.includes('image')) {
+                    const buffer = await response.buffer();
+                    const filename = `dp-${phone}-${Date.now()}.jpg`;
+                    
+                    // Save image temporarily
+                    const imagePath = path.join(__dirname, 'temp', filename);
+                    fs.writeFileSync(imagePath, buffer);
+                    
+                    return res.json({
+                        success: true,
+                        url: `/temp/${filename}`,
+                        filename: filename,
+                        quality: 'HD',
+                        size: `${(buffer.length / 1024).toFixed(1)} KB`
                     });
                 }
-            } catch (e) {
+            } catch (apiError) {
+                console.log(`API ${api} failed:`, apiError.message);
                 continue;
             }
         }
 
-        // Fallback realistic DP
-        const fallback = generateFallbackDP(phone);
-        res.json({ 
-            success: true, 
-            url: fallback,
-            filename: `whatsapp-dp-${phone.slice(-8)}.jpg`,
-            fallback: true
+        // Fallback: WhatsApp Web scraping
+        const fallbackUrl = `https://wa.me/${phone}`;
+        const html = await fetch(fallbackUrl).then(r => r.text());
+        
+        // Extract DP from WhatsApp Web
+        const dpMatch = html.match(/"profile_picture":"([^"]+)"/);
+        if (dpMatch) {
+            return res.json({
+                success: true,
+                url: dpMatch[1],
+                quality: 'Original'
+            });
+        }
+
+        // Final fallback - Generate placeholder
+        res.json({
+            success: false,
+            message: 'Private profile or no DP available',
+            placeholder: true
         });
 
     } catch (error) {
-        res.json({ 
-            success: false, 
-            message: 'Unable to fetch DP',
-            url: generateFallbackDP(req.params.phone) 
+        console.error('DP Search Error:', error);
+        res.json({
+            success: false,
+            message: 'Unable to fetch profile picture'
         });
     }
 });
 
-// Health Check
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Serve temp images
+app.use('/temp', express.static(path.join(__dirname, 'temp')));
+
+// Cleanup temp files every 10 minutes
+setInterval(() => {
+    const tempDir = path.join(__dirname, 'temp');
+    if (fs.existsSync(tempDir)) {
+        fs.readdirSync(tempDir).forEach(file => {
+            const filePath = path.join(tempDir, file);
+            if (Date.now() - fs.statSync(filePath).mtime.getTime() > 10 * 60 * 1000) {
+                fs.unlinkSync(filePath);
+            }
+        });
+    }
+}, 10 * 60 * 1000);
+
+// Create temp dir
+const tempDir = path.join(__dirname, 'temp');
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir);
+}
+
+// Serve frontend
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 404 Handler
-app.use('*', (req, res) => {
-    res.status(404).sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-function generateHash(phone) {
-    return btoa(phone + Date.now()).slice(0, 27).replace(/[^a-zA-Z0-9]/g, '');
-}
-
-function generateOH() {
-    return Math.random().toString(36).slice(2, 18);
-}
-
-function generateFallbackDP(phone) {
-    const hash = btoa(phone + 'whatsapp').slice(0, 27).replace(/[^a-zA-Z0-9]/g, '');
-    return `https://pps.whatsapp.net/v/t61/${hash}?oh=${generateOH()}&oe=66666666`;
-}
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 WhatsApp DP Downloader running on port ${PORT}`);
-    console.log(`📱 API: http://localhost:${PORT}/api/dp/+919876543210`);
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📱 Test: http://localhost:${PORT}`);
 });
