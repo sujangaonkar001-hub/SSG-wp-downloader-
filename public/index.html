@@ -1,64 +1,72 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp DP Finder</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>WhatsApp DP Proxy</title>
+    <style>
+        body { font-family: system-ui; max-width: 600px; margin: 50px auto; padding: 20px; }
+        input { width: 100%; padding: 15px; font-size: 18px; border: 2px solid #ddd; border-radius: 10px; }
+        button { background: #25D366; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; }
+        #result { margin-top: 20px; text-align: center; }
+        #dpImage { max-width: 300px; max-height: 300px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .loading { display: none; color: #666; }
+        .error { color: #e74c3c; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1><i class="fab fa-whatsapp"></i> WhatsApp DP Finder</h1>
-            <p>Enter phone number to find profile picture</p>
-        </div>
+    <h1>🔍 WhatsApp DP Proxy</h1>
+    <p>Enter phone number (+country code)</p>
+    
+    <input type="tel" id="phoneInput" placeholder="+1234567890" />
+    <button onclick="handleSearch()">Download DP</button>
+    
+    <div id="loading" class="loading">🔄 Fetching via proxy...</div>
+    <div id="result"></div>
 
-        <div class="search-box">
-            <div class="input-group">
-                <input type="tel" id="username" placeholder="+919876543210" maxlength="17" autocomplete="tel-country">
-                <button id="searchBtn">
-                    <i class="fas fa-search"></i>
-                    <span>Search DP</span>
-                </button>
-            </div>
-        </div>
+    <script>
+        async function handleSearch() {
+            const phone = document.getElementById('phoneInput').value;
+            if (!phone || phone.length < 10) return alert('Enter full number');
+            
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            loading.style.display = 'block';
+            result.innerHTML = '';
+            
+            try {
+                const res = await fetch(`/api/dp/${phone.replace(/[^\d]/g, '')}`);
+                const data = await res.json();
+                
+                loading.style.display = 'none';
+                
+                if (data.success) {
+                    if (data.image) {
+                        // Base64 image
+                        result.innerHTML = `
+                            <img id="dpImage" src="data:${data.contentType};base64,${data.image}" />
+                            <p>✅ Proxy: ${data.source}</p>
+                            <a href="data:${data.contentType};base64,${data.image}" download="dp.jpg">💾 Save HD</a>
+                        `;
+                    } else if (data.url) {
+                        result.innerHTML = `
+                            <img id="dpImage" src="${data.url}" />
+                            <p>✅ Direct: ${data.source}</p>
+                            <a href="${data.url}" target="_blank">🔗 Open Full</a>
+                        `;
+                    }
+                } else {
+                    result.innerHTML = `<p class="error">❌ ${data.message}</p>`;
+                }
+            } catch {
+                loading.style.display = 'none';
+                result.innerHTML = '<p class="error">Network error</p>';
+            }
+        }
 
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p>Finding profile picture...</p>
-        </div>
-
-        <div id="error" class="error">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span id="errorMsg"></span>
-        </div>
-
-        <div id="results" class="results" style="display: none;">
-            <div class="profile-card">
-                <div class="profile-image">
-                    <img id="dpImage" alt="Profile Picture" loading="lazy">
-                </div>
-                <div class="profile-info">
-                    <h3 id="profileName">Loading...</h3>
-                    <p id="phoneNumber"></p>
-                    <div class="stats">
-                        <span id="quality"><i class="fas fa-image"></i> Loading...</span>
-                        <span id="size"><i class="fas fa-expand"></i> Loading...</span>
-                    </div>
-                </div>
-            </div>
-            <button id="downloadBtn" class="download-btn">
-                <i class="fas fa-download"></i>
-                Download HD
-            </button>
-        </div>
-
-        <div class="footer">
-            <p><i class="fas fa-shield-alt"></i> For testing purposes only</p>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
+        // Enter key
+        document.getElementById('phoneInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') handleSearch();
+        });
+    </script>
 </body>
 </html>
