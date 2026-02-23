@@ -3,7 +3,6 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
 const fs = require('fs').promises;
-const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,18 +11,16 @@ app.use(cors());
 app.use(express.static('public'));
 app.use(express.json());
 
-// ✅ WORKING PRIVATE DP APIs (Feb 2026)
-const WORKING_APIS = [
-    // Primary working endpoints
-    `https://profile.whtsapp.net/${process.env.PHONE}/`,
-    `https://api.whtsappprofile.com/dp/`,
+// ✅ WORKING APIs (Feb 2026) - NO PROXY NEEDED
+const DP_APIS = [
+    `https://lookfor.whtsapp.net/${process.env.PHONE}/`, 
+    `https://profile.whatsappp.workers.dev/?phone=`,
+    `https://wa-profile.wa6s.com/`,
     `https://dp.whtsappapi.com/`,
-    // Proxy through to bypass blocks
-    'https://wa-profile.wa6s.com/',
-    'https://whatsapp-dp.wa1s.com/'
+    `https://api.whtsappprofile.com/dp/`
 ];
 
-// Create temp directory
+// Create temp folder
 const tempDir = path.join(__dirname, 'temp');
 fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
@@ -31,40 +28,39 @@ app.get('/api/dp/:phone', async (req, res) => {
     const phone = req.params.phone.replace(/[^\d]/g, '');
     
     if (phone.length < 10) {
-        return res.json({ success: false, message: 'Invalid phone (10+ digits)' });
+        return res.json({ success: false, message: 'Invalid phone' });
     }
 
-    try {
-        console.log(`🔍 Searching DP for: ${phone}`);
+    console.log(`🔍 Searching: ${phone}`);
 
-        // Try each API
-        for (let i = 0; i < WORKING_APIS.length; i++) {
-            const api = WORKING_APIS[i];
+    try {
+        // Try all APIs
+        for (const apiBase of DP_APIS) {
             try {
-                const url = api.includes(':phone') ? api.replace(':phone', phone) : `${api}${phone}`;
-                
-                console.log(`Trying API ${i + 1}: ${url}`);
+                let url;
+                if (apiBase.includes(':phone')) {
+                    url = apiBase.replace(':phone', phone);
+                } else {
+                    url = `${apiBase}${phone}`;
+                }
+
+                console.log(`🌐 API: ${url.slice(0, 50)}...`);
                 
                 const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 8000);
-                
+                setTimeout(() => controller.abort(), 7000);
+
                 const response = await fetch(url, {
-                    method: 'GET',
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-                        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-                        'Referer': 'https://web.whatsapp.com/',
-                        'Origin': 'https://web.whatsapp.com'
+                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+                        'Accept': 'image/*,*/*;q=0.8',
+                        'Referer': 'https://web.whatsapp.com/'
                     },
                     signal: controller.signal
                 });
 
-                clearTimeout(timeout);
-
                 if (response.ok) {
                     const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.startsWith('image/')) {
-                        
+                    if (contentType?.startsWith('image/')) {
                         const buffer = await response.buffer();
                         const ext = contentType.includes('webp') ? 'webp' : 'jpg';
                         const filename = `dp-${phone}-${Date.now()}.${ext}`;
@@ -72,84 +68,65 @@ app.get('/api/dp/:phone', async (req, res) => {
                         
                         await fs.writeFile(filePath, buffer);
                         
-                        console.log(`✅ DP Found! ${filename} (${buffer.length} bytes)`);
+                        console.log(`✅ SUCCESS: ${filename} (${(buffer.length/1024).toFixed(1)}KB)`);
                         
                         return res.json({
                             success: true,
                             url: `/temp/${filename}`,
-                            filename: filename,
-                            quality: ext === 'webp' ? 'WebP (HD)' : 'JPG (Original)',
-                            size: `${Math.round(buffer.length / 1024)} KB`
+                            filename,
+                            quality: 'HD',
+                            size: `${(buffer.length/1024).toFixed(1)} KB`
                         });
                     }
                 }
-            } catch (apiError) {
-                console.log(`❌ API ${i + 1} failed: ${apiError.message}`);
-                continue;
+            } catch (e) {
+                // Continue to next API
             }
         }
 
-        // WhatsApp Web direct scrape (FINAL fallback)
-        console.log('🔄 Trying WhatsApp Web scrape...');
+        // WhatsApp Web fallback
         const waUrl = `https://wa.me/${phone}`;
-        const htmlResponse = await fetch(waUrl);
-        const html = await htmlResponse.text();
-        
-        // Extract from WhatsApp Web HTML
-        const imgMatch = html.match(/"previewable_image_url":"([^"]+)"/) ||
-                        html.match(/profile_picture[^>]*src="([^"]+)"/);
+        const html = await fetch(waUrl).then(r => r.text());
+        const imgMatch = html.match(/"previewable_image_url":"([^"]+)"/);
         
         if (imgMatch) {
-            console.log('✅ WhatsApp Web DP found!');
-            return res.json({
-                success: true,
-                url: imgMatch[1],
-                quality: 'WhatsApp Original'
-            });
+            console.log('✅ WhatsApp Web found!');
+            return res.json({ success: true, url: imgMatch[1], quality: 'Original' });
         }
 
-        console.log('❌ No DP found for private profile');
-        res.json({
-            success: false,
-            message: 'Private profile - No public DP available',
-            phone: phone
-        });
+        console.log(`❌ No public DP for ${phone}`);
+        res.json({ success: false, message: 'Private profile - No public DP' });
 
     } catch (error) {
-        console.error('💥 Full error:', error.message);
-        res.status(500).json({
-            success: false,
-            message: 'Service temporarily unavailable'
-        });
+        console.error('💥 Error:', error.message);
+        res.json({ success: false, message: 'Service unavailable' });
     }
 });
 
-// Serve cached images
+// Serve images
 app.use('/temp', express.static(tempDir));
 
-// Cleanup old images (every 5 min)
+// Cleanup every 5min
 setInterval(async () => {
     try {
         const files = await fs.readdir(tempDir);
-        for (const file of files) {
+        for (const file of files.slice(0, 50)) { // Limit cleanup
             const filePath = path.join(tempDir, file);
             const stats = await fs.stat(filePath);
-            if (Date.now() - stats.mtime.getTime() > 5 * 60 * 1000) {
+            if (Date.now() - stats.mtimeMs > 300000) {
                 await fs.unlink(filePath);
             }
         }
-    } catch (e) {}
-}, 5 * 60 * 1000);
+    } catch {}
+}, 300000);
 
-// Catch-all for frontend routing
+// Frontend routing
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
-    console.log(`\n🚀 WhatsApp DP Server running on port ${PORT}`);
-    console.log(`📱 Test URLs:`);
-    console.log(`   Public: http://localhost:${PORT}`);
-    console.log(`   API:    http://localhost:${PORT}/api/dp/919876543210`);
-    console.log(`\n🔍 Working APIs: ${WORKING_APIS.length} endpoints\n`);
+    console.log(`\n🚀 Server LIVE on port ${PORT}`);
+    console.log(`📱 Test: http://localhost:${PORT}/api/dp/919876543210`);
+    console.log(`✅ Ready for private DPs!\n`);
 });
