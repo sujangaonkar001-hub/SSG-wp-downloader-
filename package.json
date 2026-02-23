@@ -1,21 +1,16 @@
 {
-  "name": "whatsapp-dp-finder-pro",
-  "version": "3.0.0",
-  "description": "WhatsApp DP Finder - Private Bypass Fixed",
+  "name": "whatsapp-dp-finder",
+  "version": "3.1.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
     "node-fetch": "^2.7.0"
   },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20"
   }
 }
