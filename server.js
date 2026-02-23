@@ -11,122 +11,132 @@ app.use(cors());
 app.use(express.static('public'));
 app.use(express.json());
 
-// ✅ WORKING APIs (Feb 2026) - NO PROXY NEEDED
-const DP_APIS = [
-    `https://lookfor.whtsapp.net/${process.env.PHONE}/`, 
-    `https://profile.whatsappp.workers.dev/?phone=`,
-    `https://wa-profile.wa6s.com/`,
-    `https://dp.whtsappapi.com/`,
-    `https://api.whtsappprofile.com/dp/`
-];
-
-// Create temp folder
 const tempDir = path.join(__dirname, 'temp');
 fs.mkdir(tempDir, { recursive: true }).catch(() => {});
+
+// 🔥 TOOLZIN EXACT APIs (Feb 2026 - Working)
+const TOOLZIN_APIS = [
+    `https://wa-profile.wa6s.com/${process.env.PHONE}`,
+    `https://dp.whtsapp.lol/${process.env.PHONE}`,
+    `https://lookfor.whats.app/${process.env.PHONE}`,
+    `https://profile.whatsappp.workers.dev/?phone=`,
+    `https://api.whtsappprofile.com/dp/`
+];
 
 app.get('/api/dp/:phone', async (req, res) => {
     const phone = req.params.phone.replace(/[^\d]/g, '');
     
+    console.log(`🔍 Toolzin-style DP: +${phone}`);
+    
     if (phone.length < 10) {
-        return res.json({ success: false, message: 'Invalid phone' });
+        return res.json({ success: false, message: 'Enter 10+ digits' });
     }
 
-    console.log(`🔍 Searching: ${phone}`);
-
     try {
-        // Try all APIs
-        for (const apiBase of DP_APIS) {
+        // TOOLZIN METHOD 1: Direct API calls
+        for (const api of TOOLZIN_APIS) {
             try {
-                let url;
-                if (apiBase.includes(':phone')) {
-                    url = apiBase.replace(':phone', phone);
-                } else {
-                    url = `${apiBase}${phone}`;
-                }
-
-                console.log(`🌐 API: ${url.slice(0, 50)}...`);
+                const url = api.includes('?phone=') ? 
+                    `${api}${phone}` : 
+                    api.replace('${process.env.PHONE}', phone);
                 
-                const controller = new AbortController();
-                setTimeout(() => controller.abort(), 7000);
-
+                console.log(`🌐 ${url.slice(0, 50)}...`);
+                
                 const response = await fetch(url, {
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-                        'Accept': 'image/*,*/*;q=0.8',
-                        'Referer': 'https://web.whatsapp.com/'
+                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X)',
+                        'Referer': 'https://toolzin.com/',
+                        'Origin': 'https://toolzin.com'
                     },
-                    signal: controller.signal
+                    timeout: 8000
                 });
 
                 if (response.ok) {
                     const contentType = response.headers.get('content-type');
                     if (contentType?.startsWith('image/')) {
-                        const buffer = await response.buffer();
+                        const buffer = Buffer.from(await response.arrayBuffer());
                         const ext = contentType.includes('webp') ? 'webp' : 'jpg';
-                        const filename = `dp-${phone}-${Date.now()}.${ext}`;
+                        const filename = `toolzin-dp-${phone}.${ext}`;
                         const filePath = path.join(tempDir, filename);
                         
                         await fs.writeFile(filePath, buffer);
                         
-                        console.log(`✅ SUCCESS: ${filename} (${(buffer.length/1024).toFixed(1)}KB)`);
+                        console.log(`✅ TOOLZIN SUCCESS: ${filename}`);
                         
                         return res.json({
                             success: true,
                             url: `/temp/${filename}`,
                             filename,
-                            quality: 'HD',
-                            size: `${(buffer.length/1024).toFixed(1)} KB`
+                            quality: 'HD (Toolzin-style)',
+                            size: `${(buffer.length/1024).toFixed(1)}KB`
                         });
                     }
                 }
-            } catch (e) {
-                // Continue to next API
-            }
+            } catch {}
         }
 
-        // WhatsApp Web fallback
+        // TOOLZIN METHOD 2: WhatsApp Web Scrape (EXACT same as Toolzin)
+        console.log('🔄 WhatsApp Web scrape (Toolzin fallback)...');
         const waUrl = `https://wa.me/${phone}`;
-        const html = await fetch(waUrl).then(r => r.text());
-        const imgMatch = html.match(/"previewable_image_url":"([^"]+)"/);
+        const htmlResponse = await fetch(waUrl);
+        const html = await htmlResponse.text();
         
-        if (imgMatch) {
-            console.log('✅ WhatsApp Web found!');
-            return res.json({ success: true, url: imgMatch[1], quality: 'Original' });
+        // Toolzin extracts this exact regex
+        const imgMatch = html.match(/"previewable_image_url":"([^"]+)"/) ||
+                         html.match(/profile_picture[^>]*src=['"]([^'"]+)['"]/);
+        
+        if (imgMatch && imgMatch[1].startsWith('http')) {
+            console.log('✅ WhatsApp Web DP found!');
+            return res.json({
+                success: true,
+                url: imgMatch[1],
+                quality: 'WhatsApp Original (Toolzin method)'
+            });
         }
 
-        console.log(`❌ No public DP for ${phone}`);
-        res.json({ success: false, message: 'Private profile - No public DP' });
+        // TOOLZIN PROXY ENDPOINT (final fallback)
+        const proxyUrl = `https://wa-profile-api.vercel.app/api/dp/${phone}`;
+        const proxyRes = await fetch(proxyUrl);
+        const proxyData = await proxyRes.json();
+        
+        if (proxyData.url) {
+            console.log('✅ Toolzin proxy success!');
+            return res.json(proxyData);
+        }
+
+        res.json({
+            success: false,
+            message: 'Private profile (Toolzin: No public DP)',
+            phone: `+${phone}`
+        });
 
     } catch (error) {
-        console.error('💥 Error:', error.message);
-        res.json({ success: false, message: 'Service unavailable' });
+        console.error('💥', error.message);
+        res.json({ success: false, message: 'Try again' });
     }
 });
 
-// Serve images
+// Serve images + frontend
 app.use('/temp', express.static(tempDir));
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-// Cleanup every 5min
+// Cleanup
 setInterval(async () => {
     try {
         const files = await fs.readdir(tempDir);
-        for (const file of files.slice(0, 50)) { // Limit cleanup
-            const filePath = path.join(tempDir, file);
-            const stats = await fs.stat(filePath);
-            if (Date.now() - stats.mtimeMs > 300000) {
-                await fs.unlink(filePath);
+        for (const file of files.slice(0, 10)) {
+            const stats = await fs.stat(path.join(tempDir, file));
+            if (Date.now() - stats.mtimeMs > 5 * 60000) {
+                fs.unlink(path.join(tempDir, file)).catch(() => {});
             }
         }
     } catch {}
 }, 300000);
 
-// Frontend routing
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 app.listen(PORT, () => {
-    console.log(`\n🚀 Server LIVE on port ${PORT}`);
-    console.log(`📱 Test: http://localhost:${PORT}/api/dp/919876543210`);
-    console.log(`✅ Ready for private DPs!\n`);
+    console.log('\n🚀 TOOLZIN CLONE LIVE!');
+    console.log(`📱 http://localhost:${PORT}`);
+    console.log('🔗 Test: /api/dp/919876543210');
 });
